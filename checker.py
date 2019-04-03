@@ -15,15 +15,7 @@ parser.add_argument('terraform_dir')
 
 def main():
     parsed_args = parser.parse_args()
-
-    print('Fetching terraform state...')
-    result = subprocess.run(
-        ["terraform", "state", "pull"],
-        check=True,
-        capture_output=True,
-        cwd=parsed_args.terraform_dir)
-    state = json.loads(result.stdout)
-    print('Got terraform state')
+    state = _get_tfstate(parsed_args.terraform_dir)
 
     credentials = GoogleCredentials.get_application_default()
 
@@ -234,6 +226,16 @@ def _get_gcp_folders_in_parent(service, parent_id):
         else:
             return gcp_folders
 
+
+def _get_tfstate(tf_dir):
+    print('Fetching terraform state...')
+    result = subprocess.run(
+        ["terraform", "state", "pull"],
+        check=True,
+        capture_output=True,
+        cwd=tf_dir)
+    print('Got terraform state')
+    return json.loads(result.stdout)
 
 if __name__ == '__main__':
     main()
