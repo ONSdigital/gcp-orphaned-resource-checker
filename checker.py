@@ -49,10 +49,14 @@ def check_dns(credentials, resources):
 
             for managed_zone in response['managedZones']:
                 managed_zone_name = managed_zone["name"]
-                for record_value, record_type in _get_recordsets_for_zone(service, project_id, managed_zone_name):
-                    gcp_recordsets.add((project_id, managed_zone_name, record_value, record_type))
+                for record_value, record_type in _get_recordsets_for_zone(
+                        service, project_id, managed_zone_name):
+                    gcp_recordsets.add((
+                        project_id, managed_zone_name, record_value, record_type)
+                    )
 
-            request = service.managedZones().list_next(previous_request=request, previous_response=response)
+            request = service.managedZones().list_next(
+                previous_request=request, previous_response=response)
 
     dns_rs_states = set(
         (
