@@ -25,13 +25,11 @@ def main():
     print('Got terraform state')
 
     credentials = GoogleCredentials.get_application_default()
-    service_v1 = discovery.build('cloudresourcemanager', 'v1', credentials=credentials)
-    service_v2 = discovery.build('cloudresourcemanager', 'v2', credentials=credentials)
 
     for module in state['modules']:
-        check_org_iam(service_v1, module)
-        check_folders(service_v2, module)
-        check_folder_iam(service_v2, module)
+        check_org_iam(credentials, module)
+        check_folders(credentials, module)
+        check_folder_iam(credentials, module)
         check_dns(credentials, module)
 
 
@@ -79,7 +77,9 @@ def check_dns(credentials, state):
             print(f'\t{name} ({rs_type} record)\n\t\tin managed zone {zone} of project {project_id}')
 
 
-def check_folders(service, state):
+def check_folders(credentials, state):
+    service = discovery.build('cloudresourcemanager', 'v2', credentials=credentials)
+
     folder_states = {
         key: resource for key, resource in state['resources'].items()
         if resource['type'] == 'google_folder'
@@ -110,7 +110,9 @@ def check_folders(service, state):
             print(f'\t{folder_data["displayName"]} ({folder_data["name"]})')
 
 
-def check_org_iam(service, state):
+def check_org_iam(credentials, state):
+    service = discovery.build('cloudresourcemanager', 'v1', credentials=credentials)
+
     org_state = next(
         resource for resource in state['resources'].values()
         if resource['type'] == 'google_organization'
@@ -145,7 +147,9 @@ def check_org_iam(service, state):
             print(f'\t{member}: {role}')
 
 
-def check_folder_iam(service, state):
+def check_folder_iam(credentials, state):
+    service = discovery.build('cloudresourcemanager', 'v2', credentials=credentials)
+
     folder_states = {
         resolve_pointer(resource, '/primary/attributes/id'): resource
         for resource in state['resources'].values()
