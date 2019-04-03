@@ -8,7 +8,8 @@ from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(
+    description="Tool to identify resources in GCP that aren't managed by terraform.")
 parser.add_argument('terraform_dir')
 
 
@@ -38,6 +39,10 @@ def main():
 
 
 def check_dns(credentials, resources):
+    """
+    Prints any non-terraformed recordsets that belong to a managed
+    zone that was created by terraform
+    """
     service = discovery.build('dns', 'v1', credentials=credentials)
 
     project_states = list(resources['google_project'])
@@ -78,6 +83,9 @@ def check_dns(credentials, resources):
 
 
 def check_folders(credentials, resources):
+    """
+    Prints any non-terraformed folders which are siblings of terraformed folders
+    """
     service = discovery.build('cloudresourcemanager', 'v2', credentials=credentials)
 
     folder_states = resources['google_folder']
@@ -108,6 +116,9 @@ def check_folders(credentials, resources):
 
 
 def check_org_iam(credentials, resources):
+    """
+    Prints any non-terraformed IAM bindings defined on the organisation
+    """
     service = discovery.build('cloudresourcemanager', 'v1', credentials=credentials)
 
     org_state = next(iter(resources['google_organization']))
@@ -141,6 +152,9 @@ def check_org_iam(credentials, resources):
 
 
 def check_folder_iam(credentials, resources):
+    """
+    Prints any non-terraformed IAM bindings on any terraformed folder
+    """
     service = discovery.build('cloudresourcemanager', 'v2', credentials=credentials)
 
     folder_states = {
