@@ -27,19 +27,20 @@ def main():
     credentials = GoogleCredentials.get_application_default()
 
     for module in state['modules']:
-        check_org_iam(credentials, module)
-        check_folders(credentials, module)
-        check_folder_iam(credentials, module)
-        check_dns(credentials, module)
+        resources = collections.defaultdict(list)
+        for resource in module['resources'].values():
+            resources[resource.get('type')].append(resource)
+
+        check_org_iam(credentials, resources)
+        check_folders(credentials, resources)
+        check_folder_iam(credentials, resources)
+        check_dns(credentials, resources)
 
 
-def check_dns(credentials, state):
+def check_dns(credentials, resources):
     service = discovery.build('dns', 'v1', credentials=credentials)
 
-    project_states = [
-        resource for resource in state['resources'].values()
-        if resource['type'] == 'google_project'
-    ]
+    project_states = list(resources['google_project'])
 
     gcp_recordsets = set()
     for project in project_states:
@@ -63,8 +64,7 @@ def check_dns(credentials, state):
             resolve_pointer(resource, '/primary/attributes/name'),
             resolve_pointer(resource, '/primary/attributes/type'),
         )
-        for resource in state['resources'].values()
-        if resource['type'] == 'google_dns_record_set'
+        for resource in resources['google_dns_record_set']
     )
 
     missing_dns = gcp_recordsets.difference(dns_rs_states)
@@ -77,17 +77,14 @@ def check_dns(credentials, state):
             print(f'\t{name} ({rs_type} record)\n\t\tin managed zone {zone} of project {project_id}')
 
 
-def check_folders(credentials, state):
+def check_folders(credentials, resources):
     service = discovery.build('cloudresourcemanager', 'v2', credentials=credentials)
 
-    folder_states = {
-        key: resource for key, resource in state['resources'].items()
-        if resource['type'] == 'google_folder'
-    }
+    folder_states = resources['google_folder']
 
     parent_ids = [
         resolve_pointer(folder, '/primary/attributes/parent')
-        for folder in folder_states.values()
+        for folder in folder_states
     ]
     parent_ids = set(filter(None, parent_ids))
 
@@ -97,7 +94,7 @@ def check_folders(credentials, state):
 
     state_folders = set(
         resolve_pointer(folder, '/primary/attributes/name')
-        for folder in folder_states.values()
+        for folder in folder_states
     )
     gcp_folder_ids = set(gcp_folders.keys())
     missing_folder_ids = gcp_folder_ids.difference(state_folders)
@@ -110,13 +107,10 @@ def check_folders(credentials, state):
             print(f'\t{folder_data["displayName"]} ({folder_data["name"]})')
 
 
-def check_org_iam(credentials, state):
+def check_org_iam(credentials, resources):
     service = discovery.build('cloudresourcemanager', 'v1', credentials=credentials)
 
-    org_state = next(
-        resource for resource in state['resources'].values()
-        if resource['type'] == 'google_organization'
-    )
+    org_state = next(iter(resources['google_organization']))
 
     request = service.organizations().getIamPolicy(
         resource=resolve_pointer(org_state, '/primary/attributes/name'))
@@ -132,8 +126,7 @@ def check_org_iam(credentials, state):
             resolve_pointer(resource, '/primary/attributes/member'),
             resolve_pointer(resource, '/primary/attributes/role'),
         )
-        for resource in state['resources'].values()
-        if resource['type'] == 'google_organization_iam_member'
+        for resource in resources['google_organization_iam_member']
     )
 
     missing_iam_ids = gcp_iam_ids.difference(state_iam_ids)
@@ -147,20 +140,18 @@ def check_org_iam(credentials, state):
             print(f'\t{member}: {role}')
 
 
-def check_folder_iam(credentials, state):
+def check_folder_iam(credentials, resources):
     service = discovery.build('cloudresourcemanager', 'v2', credentials=credentials)
 
     folder_states = {
         resolve_pointer(resource, '/primary/attributes/id'): resource
-        for resource in state['resources'].values()
-        if resource['type'] == 'google_folder'
+        for resource in resources['google_folder']
     }
 
     iam_states_by_folder_name = collections.defaultdict(list)
-    for resource in state['resources'].values():
-        if resource['type'] == 'google_folder_iam_member':
-            folder_name = resolve_pointer(resource, '/primary/attributes/folder')
-            iam_states_by_folder_name[folder_name].append(resource)
+    for member_resource in resources['google_folder_iam_member']:
+        folder_name = resolve_pointer(member_resource, '/primary/attributes/folder')
+        iam_states_by_folder_name[folder_name].append(member_resource)
 
     for folder_name, folder_resources in iam_states_by_folder_name.items():
         request = service.folders().getIamPolicy(resource=folder_name)
