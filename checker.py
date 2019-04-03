@@ -79,22 +79,6 @@ def check_dns(credentials, state):
             print(f'\t{name} ({rs_type} record)\n\t\tin managed zone {zone} of project {project_id}')
 
 
-def _get_recordsets_for_zone(service, project_id, zone_name):
-    recordsets = []
-    request = service.resourceRecordSets().list(
-        project=project_id, managedZone=zone_name)
-    while request is not None:
-        response = request.execute()
-
-        recordsets += [
-            (resource["name"], resource["type"],) for resource in response['rrsets']
-        ]
-
-        request = service.resourceRecordSets().list_next(previous_request=request, previous_response=response)
-
-    return recordsets
-
-
 def check_folders(service, state):
     folder_states = {
         key: resource for key, resource in state['resources'].items()
@@ -203,6 +187,22 @@ def check_folder_iam(service, state):
             for missing_iam_id in missing_iam_ids:
                 member, role = missing_iam_id
                 print(f'\t{member}: {role}')
+
+
+def _get_recordsets_for_zone(service, project_id, zone_name):
+    recordsets = []
+    request = service.resourceRecordSets().list(
+        project=project_id, managedZone=zone_name)
+    while request is not None:
+        response = request.execute()
+
+        recordsets += [
+            (resource["name"], resource["type"],) for resource in response['rrsets']
+        ]
+
+        request = service.resourceRecordSets().list_next(previous_request=request, previous_response=response)
+
+    return recordsets
 
 
 def _get_gcp_folders_in_parent(service, parent_id):
